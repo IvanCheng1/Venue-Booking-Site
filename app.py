@@ -84,7 +84,7 @@ class Artist(db.Model):
 
     def __repr__(self):
         return ("--------------ARTIST---------------\n"
-                f"Venue:               {self.name}\n"
+                f"Name:                {self.name}\n"
                 f"city:                {self.city}\n"
                 f"state:               {self.state}\n"
                 f"phone:               {self.phone}\n"
@@ -415,8 +415,30 @@ def show_artist(artist_id):
 
     try:
         artist = Artist.query.get(artist_id)
-
-
+        shows = artist.shows
+        future_shows = []
+        past_shows = []
+        
+        for show in shows:
+            future_show = {}
+            past_show = {}
+            
+            if datetime.datetime.now() < show.start_time: 
+                # future
+                future_show['venue_id'] = show.venue_id
+                future_show['venue_name'] = Venue.query.get(show.venue_id).name
+                future_show['venue_image_link'] = Venue.query.get(show.venue_id).image_link
+                future_show['start_time'] = show.start_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+                future_shows.append(future_show)
+            elif datetime.datetime.now() >= show.start_time: 
+                # past
+                past_show['venue_id'] = show.venue_id
+                past_show['venue_name'] = Venue.query.get(show.venue_id).name
+                past_show['venue_image_link'] = Venue.query.get(show.venue_id).image_link
+                past_show['start_time'] = show.start_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+                past_shows.append(past_show)
+        
+        
         data = {
             "id": artist.id,
             "name": artist.name,
@@ -429,17 +451,12 @@ def show_artist(artist_id):
             "seeking_venue": artist.seeking_venue,
             "seeking_description": artist.seeking_description,
             "image_link": artist.image_link,
-            "past_shows": [{
-                "venue_id": 1,
-                "venue_name": "The Musical Hop",
-                "venue_image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
-                "start_time": "2019-05-21T21:30:00.000Z"
-            }],
-            "upcoming_shows": [],
-            "past_shows_count": 1,
-            "upcoming_shows_count": 0,
+            "past_shows": past_shows,
+            "upcoming_shows": future_shows,
+            "past_shows_count": len(past_shows),
+            "upcoming_shows_count": len(future_shows),
         }
-
+        print("test")
     except:
         error = True
         db.session.rollback()
