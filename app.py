@@ -12,6 +12,8 @@ import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
+from flask_migrate import Migrate
+import sys
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -21,7 +23,9 @@ moment = Moment(app)
 app.config.from_object('config')
 db = SQLAlchemy(app)
 
-# TODO: connect to a local postgresql database
+# DONE: connect to a local postgresql database
+migrate = Migrate(app, db)
+# db.create_all()
 
 #----------------------------------------------------------------------------#
 # Models.
@@ -36,10 +40,30 @@ class Venue(db.Model):
     state = db.Column(db.String(120))
     address = db.Column(db.String(120))
     phone = db.Column(db.String(120))
+    genres = db.Column(db.ARRAY(db.String()))
     image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
+    facebook_link = db.Column(db.String(500))
+    website = db.Column(db.String())
+    seeking_talent = db.Column(db.String(120))
+    seeking_description = db.Column(db.String())
+    shows = db.relationship('Show', backref="Venue", lazy=True)
 
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    def __repr__(self):
+        return ("---------------VENUE---------------\n"
+                f"Venue:               {self.name}\n"
+                f"city:                {self.city}\n"
+                f"state:               {self.state}\n"
+                f"address:             {self.address}\n"
+                f"phone:               {self.phone}\n"
+                f"genres:              {self.genres}\n"
+                f"image_link:          {self.image_link}\n"
+                f"facebook_link:       {self.facebook_link}\n"
+                f"website:             {self.website}\n"
+                f"seeking_talent:      {self.seeking_talent}\n"
+                f"seeking_description: {self.seeking_description}\n\n"
+                )
+
+    # DONE: implement any missing fields, as a database migration using Flask-Migrate
 
 class Artist(db.Model):
     __tablename__ = 'Artist'
@@ -49,13 +73,42 @@ class Artist(db.Model):
     city = db.Column(db.String(120))
     state = db.Column(db.String(120))
     phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
+    genres = db.Column(db.ARRAY(db.String()))
     image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
+    facebook_link = db.Column(db.String(500))
+    website = db.Column(db.String())
+    seeking_venue = db.Column(db.String(120))
+    seeking_description = db.Column(db.String())
+    shows = db.relationship('Show', backref="Artist", lazy=True)
 
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    def __repr__(self):
+        return ("--------------ARTIST---------------\n"
+                f"Venue:               {self.name}\n"
+                f"city:                {self.city}\n"
+                f"state:               {self.state}\n"
+                f"phone:               {self.phone}\n"
+                f"genres:              {self.genres}\n"
+                f"image_link:          {self.image_link}\n"
+                f"facebook_link:       {self.facebook_link}\n"
+                f"website:             {self.website}\n"
+                f"seeking_venue:       {self.seeking_venue}\n"
+                f"seeking_description: {self.seeking_description}\n\n"
+                )
 
-# TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
+    # DONE: implement any missing fields, as a database migration using Flask-Migrate
+
+# DONE Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
+class Show(db.Model):
+    __tablename__ = 'Show'
+
+    id = db.Column(db.Integer, primary_key=True)
+    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)
+    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False)
+
+    def __repr__(self):
+        return f"<Show {self.artist_id} {self.venue_id}>"
+
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -219,15 +272,45 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
-  # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
+    error = False
+    data = request.form
+    if 'seeking_talent' not in data:
+        s_talent = False
+    elif data['seeking_talent'] == 'y':
+        s_talent = True
 
-  # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
-  # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+    try:
+        venue = Venue(
+            name = data['name'],
+            city = data['city'],
+            state = data['state'],
+            address = data['address'],
+            phone = data['phone'],
+            image_link = data['image_link'],
+            facebook_link = data['facebook_link'],
+            genres = data.getlist('genres'),
+            website = data['website'],
+            seeking_talent = s_talent,
+            seeking_description = data['seeking_description']
+        )
+        db.session.add(venue)
+        db.session.commit()
+    except:
+        error = True
+        db.session.rollback()
+        print(sys.exc_info())
+    finally:
+        print("\n ----------------NEW----------------\n", venue)
+        db.session.close()
+
+    if not error:
+        flash('Venue ' + data['name'] + ' was successfully listed!')
+        return render_template('pages/home.html')
+    else:
+        flash('An error occurred. Venue ' + data['name'] + ' could not be listed.')
+        return redirect(url_for('create_venue_form'))
+
+    
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
@@ -412,15 +495,42 @@ def create_artist_form():
 
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
-  # called upon submitting the new artist listing form
-  # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
+    error = False
+    data = request.form
+    if 'seeking_venue' not in data:
+        s_venue = False
+    elif data['seeking_venue'] == 'y':
+        s_venue = True
 
-  # on successful db insert, flash success
-  flash('Artist ' + request.form['name'] + ' was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
-  return render_template('pages/home.html')
+    try:
+        artist = Artist(
+            name = data['name'],
+            city = data['city'],
+            state = data['state'],
+            phone = data['phone'],
+            genres = data.getlist('genres'),
+            image_link = data['image_link'],
+            facebook_link = data['facebook_link'],
+            website = data['website'],
+            seeking_venue = s_venue,
+            seeking_description = data['seeking_description']
+        )
+        db.session.add(artist)
+        db.session.commit()
+    except:
+        error = True
+        db.session.rollback()
+        print(sys.exc_info())
+    finally:
+        print("\n ----------------NEW----------------\n", artist)
+        db.session.close()
+        
+    if not error:
+        flash('Artist ' + data['name'] + ' was successfully listed!')
+        return render_template('pages/home.html')
+    else:
+        flash('An error occurred. Artist ' + data['name'] + ' could not be listed.')
+        return redirect(url_for('create_artist_form'))
 
 
 #  Shows
