@@ -107,7 +107,11 @@ class Show(db.Model):
     start_time = db.Column(db.DateTime, nullable=False)
 
     def __repr__(self):
-        return f"<Show {self.artist_id} {self.venue_id}>"
+        return ("---------------SHOW----------------\n"
+                f"artist_id:  {self.artist_id}\n"
+                f"venue_id:   {self.venue_id}\n"
+                f"start_time: {self.start_time}\n\n"
+                )
 
 
 #----------------------------------------------------------------------------#
@@ -410,7 +414,6 @@ def show_artist(artist_id):
 
     try:
         artist = Artist.query.get(artist_id)
-        # print(artist.show)
 
 
         data = {
@@ -684,15 +687,47 @@ def create_shows():
 
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
-  # called to create new shows in the db, upon submitting new show listing form
-  # TODO: insert form data as a new Show record in the db, instead
+    # called to create new shows in the db, upon submitting new show listing form
+    # TODO: insert form data as a new Show record in the db, instead
+    error = False
+    data = request.form
 
-  # on successful db insert, flash success
-  flash('Show was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Show could not be listed.')
-  # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+    try:
+        show = Show(
+            artist_id = data['artist_id'],
+            venue_id = data['venue_id'],
+            start_time = data['start_time']
+        )
+        artist = Artist.query.get(show.artist_id)
+        venue = Venue.query.get(show.venue_id)
+        if artist and venue:
+            db.session.add(show)
+            db.session.commit()
+        elif artist and not venue:
+            flash('Venue not found! Check Venue ID on Venue\'s page.')
+            error = True
+        elif venue and not artist:
+            flash('Artist not found! Check Artist ID on Artist\'s page.')
+            error = True
+        else:
+            flash('Venue and Artist not found! Check Artist ID and Venue ID.')
+            error = True
+
+    except:
+        error = True
+        db.session.rollback()
+        print(sys.exc_info())
+        flash('An error occurred. Show could not be listed.')
+    finally:
+        print("\n ----------------NEW----------------\n", show)
+        db.session.close()
+
+    if not error:
+        flash('Show was successfully listed!')
+        return render_template('pages/home.html')
+    else:
+        return redirect(url_for('create_shows'))
+
 
 @app.errorhandler(404)
 def not_found_error(error):
