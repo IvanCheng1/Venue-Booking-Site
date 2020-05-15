@@ -46,6 +46,7 @@
 		<img src="{{ venue.image_link }}" alt="Venue Image" />
 	</div>
 </div>
+{% if venue.upcoming_shows_count > 0 %}
 <section>
 	<h2 class="monospace">{{ venue.upcoming_shows_count }} Upcoming {% if venue.upcoming_shows_count == 1 %}Show{% else %}Shows{% endif %}</h2>
 	<div class="row">
@@ -60,6 +61,8 @@
 		{% endfor %}
 	</div>
 </section>
+{% endif %}
+{% if venue.past_shows_count > 0 %}
 <section>
 	<h2 class="monospace">{{ venue.past_shows_count }} Past {% if venue.past_shows_count == 1 %}Show{% else %}Shows{% endif %}</h2>
 	<div class="row">
@@ -74,6 +77,25 @@
 		{% endfor %}
 	</div>
 </section>
+{% endif %}
+    <button type="button" id="delete" class="btn btn-primary btn-lg" data-id="{{ venue.id }}">Delete Venue</button>
+    <a href="/venues/{{ venue.id }}/edit">
+        <button type="button" id="edit" class="btn btn-primary btn-lg" data-id="{{ venue.id }}">Edit Venue</button>
+    </a>
 
+    <script>
+        const delete_btn = document.getElementById('delete');
+        delete_btn.onclick = function (e) {
+            // console.log(e);
+            const venue_id = e.target.dataset['id'];
+            // console.log(venue_id);
+
+            fetch('/venues/' + venue_id, {
+                method: 'DELETE'
+            })
+            .then(response => { window.location = "/"; 
+            })
+        }
+    </script>
 {% endblock %}
 
